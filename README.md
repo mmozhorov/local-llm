@@ -12,7 +12,9 @@
 - **Ollama** — рантайм для GGUF, OpenAI-совместимый API, CUDA на Windows и Metal на macOS из коробки.
 - **Qwen2.5 14B Instruct (Q4_K_M)** — основная модель: сильна в русском, помещается и в 12 ГБ VRAM, и в 24 ГБ unified.
 - **Mistral Nemo 12B Instruct (Q4_K_M)** — запасной вариант: контекст 128k, удобно для длинных глав.
+- **XTTS-v2 (Coqui)** — озвучка с клонированием голоса по 10-секундному сэмплу.
 - Python-скрипт `translate/translate_book.py` — нарезает книгу на куски и переводит через локальный API.
+- Python-скрипт `audio/tts_book.py` — превращает переведённый `.txt` в `.m4b` с разметкой глав.
 
 ## Структура
 
@@ -35,6 +37,12 @@
 │   ├── requirements.txt
 │   ├── translate_book.py
 │   └── config.example.yaml
+├── audio/
+│   ├── requirements.txt
+│   ├── tts_book.py
+│   ├── preprocess.py
+│   ├── config.example.yaml
+│   └── voices/.gitkeep
 └── .gitignore
 ```
 
@@ -146,6 +154,81 @@ python translate/translate_book.py \
 - Режет текст по границам абзацев (двойной перевод строки), стараясь уложиться в `--chunk-chars` (по умолчанию 4000 символов).
 - После каждого куска сохраняет прогресс в `<output>.progress.json` — при разрыве свяжите запуск через `--resume`.
 - Использует `/api/chat`, поэтому уважает системный промпт из Modelfile.
+
+## Озвучка (XTTS-v2)
+
+Превращаем переведённый `.txt` в `.m4b` (или `.mp3`) с клонированием голоса диктора.
+
+> **Лицензия.** XTTS-v2 распространяется под Coqui Public Model License — **только некоммерческое использование**. Для личной аудиокниги «послушать по дороге» — ок, в продакшн или на продажу — нет.
+
+### Подготовка окружения
+
+XTTS-v2 хочет **Python 3.10 или 3.11** (на 3.12 ломаются зависимости) и ffmpeg.
+
+```bash
+# macOS
+brew install ffmpeg python@3.11
+/opt/homebrew/bin/python3.11 -m venv .venv-audio
+source .venv-audio/bin/activate
+pip install -r audio/requirements.txt
+```
+
+```powershell
+# Windows
+winget install Gyan.FFmpeg
+winget install Python.Python.3.11
+py -3.11 -m venv .venv-audio
+.\.venv-audio\Scripts\Activate.ps1
+pip install -r audio\requirements.txt
+# Поверх — torch с CUDA (иначе будет CPU-only):
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+```
+
+### Подготовка сэмпла голоса
+
+XTTS клонирует голос по референсной записи. Положите файл в `audio/voices/`:
+
+- один говорящий, без музыки и шумов;
+- **6–30 секунд** (оптимум 10–20);
+- mono, 24 кГц, 16-bit PCM `.wav`;
+- живой говор, разная интонация (не монотонное чтение).
+
+Привести готовую запись к нужному формату:
+
+```bash
+ffmpeg -i source.mp3 -ac 1 -ar 24000 -sample_fmt s16 audio/voices/narrator.wav
+```
+
+### Запуск
+
+```bash
+python audio/tts_book.py \
+    --input  book.ru.txt \
+    --output book.ru.m4b \
+    --voice  audio/voices/narrator.wav \
+    --accent
+```
+
+Что делает скрипт:
+
+- ищет в тексте строки вида `Глава 1` / `Chapter I` и режет книгу на главы; на выходе `.m4b` с метаданными глав (плеер покажет «12 / 24», можно прыгать);
+- разворачивает числа в слова, аббревиатуры (`т.е.`, `г.` и т. п.), приводит тире/кавычки;
+- если установлен `ruaccent` и передан `--accent` — расставляет ударения, чтобы XTTS не путал «за́мок/замо́к»;
+- кеширует каждое предложение в `book.ru.m4b.cache/` по SHA-сэмпла и текста — упало посередине, перезапустите команду без потерь.
+
+### Сколько это занимает
+
+Оценка для книги ~80k слов (≈10 часов аудио):
+
+- **3060 12 ГБ**: ~3–4 часа реального времени.
+- **M4 24 ГБ (MPS)**: ~6–8 часов.
+- CPU (`--no-gpu`): сутки и больше, не делайте так.
+
+### Грабли
+
+- Первый запуск тянет модель XTTS-v2 (~2 ГБ) и просит подтвердить лицензию через `COQUI_TOS_AGREED=1`. На неинтерактивной машине задайте переменную: `set COQUI_TOS_AGREED=1` / `export COQUI_TOS_AGREED=1`.
+- На длинных предложениях (>240 символов) XTTS склонна «зажёвывать» концовку — поэтому `preprocess.py` режет на чанки <240 символов. Не увеличивайте `--chunk-chars` сверх 280–300.
+- Ударения от `ruaccent` не на 100% правильные — для важных имён добавьте `+` вручную: `Бара́баш`.
 
 ## Подключение IDE / чат-клиентов
 

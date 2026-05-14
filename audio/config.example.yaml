@@ -1,0 +1,10 @@
+# Пример параметров для tts_book.py. Можно не использовать — все есть и в CLI.
+
+input:  ./book.ru.txt
+output: ./book.ru.m4b
+voice:  audio/voices/narrator.wav
+
+language: ru
+accent: true          # ruaccent: ставит ударения, заметно улучшает русский
+chunk_chars: 240      # XTTS-v2 теряет качество на кусках длиннее ~250 символов
+gpu: true             # CUDA на Windows, MPS на Mac
