@@ -1,0 +1,22 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Translation artefacts
+translate/config.yaml
+*.progress.json
+
+# Locally downloaded books / translations
+books/
+out/
+*.epub
+*.pdf
+*.mobi
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
