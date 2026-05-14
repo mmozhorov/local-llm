@@ -1,109 +1,155 @@
-# Локальная LLM на Windows (i7-14700F, 32 ГБ ОЗУ, RTX 3060 12 ГБ)
+# Локальная LLM для перевода книг
 
-Готовый набор скриптов и конфигов, чтобы быстро поднять локальную LLM на Windows-машине с указанным железом и использовать её для перевода книг с английского на русский.
+Готовый набор скриптов, Modelfile-ов и Python-утилит, чтобы быстро поднять локальную LLM на одной из двух машин и переводить книги с английского на русский:
 
-Стек:
+| Машина | OS | Память | GPU |
+|---|---|---|---|
+| Десктоп | Windows 11 | 32 ГБ DDR5 + 12 ГБ VRAM | RTX 3060, i7-14700F |
+| Ноутбук | macOS | 24 ГБ unified | MacBook Pro M4 (Apple Silicon, Metal) |
 
-- **Ollama** — рантайм для GGUF-моделей с CUDA-ускорением и OpenAI-совместимым API.
-- **Qwen2.5 14B Instruct (Q4_K_M)** — основная модель: сильна в русском и в художественном переводе, помещается в 12 ГБ VRAM.
+Стек одинаковый для обеих:
+
+- **Ollama** — рантайм для GGUF, OpenAI-совместимый API, CUDA на Windows и Metal на macOS из коробки.
+- **Qwen2.5 14B Instruct (Q4_K_M)** — основная модель: сильна в русском, помещается и в 12 ГБ VRAM, и в 24 ГБ unified.
 - **Mistral Nemo 12B Instruct (Q4_K_M)** — запасной вариант: контекст 128k, удобно для длинных глав.
 - Python-скрипт `translate/translate_book.py` — нарезает книгу на куски и переводит через локальный API.
 
-## Что в репозитории
+## Структура
 
 ```
 .
 ├── README.md
 ├── scripts/
-│   ├── install.ps1         # ставит Ollama и проверяет CUDA / NVIDIA-драйвер
-│   ├── pull-models.ps1     # скачивает базовые модели и собирает Modelfile-варианты
-│   └── start-api.ps1       # запускает Ollama-сервер с нужными параметрами
+│   ├── windows/
+│   │   ├── install.ps1
+│   │   ├── pull-models.ps1
+│   │   └── start-api.ps1
+│   └── macos/
+│       ├── install.sh
+│       ├── pull-models.sh
+│       └── start-api.sh
 ├── modelfiles/
 │   ├── translator-qwen.Modelfile
 │   └── translator-nemo.Modelfile
 ├── translate/
 │   ├── requirements.txt
-│   ├── translate_book.py   # CLI: txt -> txt (с разбивкой по абзацам)
+│   ├── translate_book.py
 │   └── config.example.yaml
 └── .gitignore
 ```
 
-## Быстрый старт
+Modelfile-ы платформонезависимые — одинаково собираются и на Windows, и на macOS.
 
-1. Откройте **PowerShell от имени администратора** в корне репозитория.
+---
 
-2. Разрешите выполнение скриптов в этой сессии:
+## Windows (i7-14700F, 32 ГБ, RTX 3060 12 ГБ)
+
+1. Откройте **PowerShell от имени администратора** в корне репозитория и разрешите выполнение скриптов в сессии:
 
    ```powershell
    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
    ```
 
-3. Установите Ollama и проверьте, что видеокарта видна:
+2. Поставьте Ollama и убедитесь, что 3060 видна:
 
    ```powershell
-   .\scripts\install.ps1
+   .\scripts\windows\install.ps1
    ```
 
-   Скрипт:
-   - проверит наличие NVIDIA-драйвера и `nvidia-smi`;
-   - установит Ollama через `winget` (если не установлен);
-   - проверит, что сервис `ollama` запускается и видит CUDA.
-
-4. Скачайте модели и создайте «переводческие» варианты с системным промптом:
+3. Скачайте модели и соберите «переводческие» образы:
 
    ```powershell
-   .\scripts\pull-models.ps1
+   .\scripts\windows\pull-models.ps1
    ```
 
-   По умолчанию тянутся:
-   - `qwen2.5:14b-instruct-q4_K_M` (~9 ГБ) — основная;
-   - `mistral-nemo:12b-instruct-2407-q4_K_M` (~7 ГБ) — для длинного контекста.
-
-   Из них собираются образы `translator-qwen` и `translator-nemo` с готовым системным промптом для перевода.
-
-5. Запустите API (если он ещё не работает фоновым сервисом):
+4. (Опционально) Запустите API руками — обычно достаточно фонового сервиса:
 
    ```powershell
-   .\scripts\start-api.ps1
+   .\scripts\windows\start-api.ps1
    ```
 
-   Ollama слушает `http://localhost:11434`. OpenAI-совместимый эндпоинт: `http://localhost:11434/v1`.
+### Подсказки по производительности
 
-6. Установите Python-зависимости и переведите книгу:
+- План электропитания — **«Высокая производительность»**, иначе p-ядра 14700F троттлят на длинных генерациях.
+- 3060 12 ГБ — впритык: закрывайте браузер/игры, иначе VRAM заняется и упадёт скорость.
+- Ожидаемая скорость на Qwen2.5 14B Q4_K_M: **20–30 ток/с** на пустом контексте, **8–12 ток/с** ближе к 8k.
+- Если ловите `CUDA error: out of memory` — уменьшите `num_ctx` в `modelfiles/translator-qwen.Modelfile` до `4096` и пересоберите образ: `ollama create translator-qwen -f modelfiles\translator-qwen.Modelfile`.
 
-   ```powershell
-   python -m venv .venv
-   .\.venv\Scripts\Activate.ps1
-   pip install -r translate\requirements.txt
+---
 
-   python translate\translate_book.py `
-       --input "C:\books\book.txt" `
-       --output "C:\books\book.ru.txt" `
-       --model translator-qwen
+## macOS (MacBook Pro M4, 24 ГБ unified)
+
+1. Откройте Terminal в корне репозитория.
+
+2. Поставьте Ollama (через Homebrew или .dmg вручную):
+
+   ```bash
+   bash scripts/macos/install.sh
    ```
 
-## Под капотом: настройки под 12 ГБ VRAM
+3. Скачайте модели и соберите образы:
 
-В `modelfiles/translator-qwen.Modelfile`:
+   ```bash
+   bash scripts/macos/pull-models.sh
+   ```
 
-- `num_ctx 8192` — окно контекста на инференс (около 7–8 ГБ суммарной VRAM с моделью);
-- `num_gpu 99` — оффлоадить все слои на GPU (Ollama сам ограничит, если не влезет);
-- `temperature 0.3`, `top_p 0.9` — низкая «креативность», чтобы перевод был стабильным;
-- `repeat_penalty 1.1` — гасит зацикливания на длинных текстах.
+4. (Опционально) Запустите сервер руками, если не хватает того, что подняла .app:
 
-Если модель не помещается — уменьшите `num_ctx` до `4096` или возьмите `qwen2.5:7b-instruct-q5_K_M`.
+   ```bash
+   bash scripts/macos/start-api.sh
+   ```
 
-## Проверка вручную
+### Подсказки по производительности
 
-```powershell
-curl http://localhost:11434/api/generate -d '{
-  \"model\": \"translator-qwen\",
-  \"prompt\": \"Translate to Russian: The quick brown fox jumps over the lazy dog.\",
-  \"stream\": false
-}'
+- На Apple Silicon GPU использует общую с CPU память; по умолчанию macOS даёт ~75% RAM. На 24 ГБ это около 18 ГБ — хватает на Qwen2.5 14B Q4_K_M с большим контекстом.
+- Если хотите выжать максимум контекста или запускать модель крупнее 14B — поднимите `wired`-лимит:
+
+  ```bash
+  sudo sysctl iogpu.wired_limit_mb=20480   # 20 ГБ под GPU
+  ```
+
+  Сбрасывается после перезагрузки; чтобы навсегда — пропишите строку в `/etc/sysctl.conf`.
+- Скорость на M4 c Qwen2.5 14B Q4_K_M: **порядка 12–18 ток/с**, на маленьких контекстах быстрее.
+- Mac удобнее под более жирные кванты: можно поставить `qwen2.5:14b-instruct-q5_K_M` (~10 ГБ) — качество чуть выше.
+
+---
+
+## Перевод книги
+
+Установка зависимостей (одинаковая для обеих ОС, только активация venv разная):
+
+```bash
+# macOS
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r translate/requirements.txt
 ```
 
-Или через OpenAI-совместимый эндпоинт (подходит для Continue, Open WebUI, Cursor и т. п.):
+```powershell
+# Windows
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r translate\requirements.txt
+```
+
+Запуск:
+
+```bash
+python translate/translate_book.py \
+    --input  ~/books/book.txt \
+    --output ~/books/book.ru.txt \
+    --model  translator-qwen
+```
+
+Особенности скрипта:
+
+- Режет текст по границам абзацев (двойной перевод строки), стараясь уложиться в `--chunk-chars` (по умолчанию 4000 символов).
+- После каждого куска сохраняет прогресс в `<output>.progress.json` — при разрыве свяжите запуск через `--resume`.
+- Использует `/api/chat`, поэтому уважает системный промпт из Modelfile.
+
+## Подключение IDE / чат-клиентов
+
+Ollama сразу даёт OpenAI-совместимый эндпоинт:
 
 ```
 Base URL:  http://localhost:11434/v1
@@ -111,15 +157,31 @@ API key:   ollama          (любая непустая строка)
 Model:     translator-qwen
 ```
 
-## Подсказки по производительности
+Этого достаточно для Continue, Cursor, Open WebUI, Raycast AI и т. п.
 
-- На 14700F поставьте план электропитания **«Высокая производительность»**, иначе p-ядра троттлят при долгих генерациях.
-- Закройте браузер / игры: 3060 12 ГБ — впритык, любая занятая VRAM портит скорость.
-- Скорость на Qwen2.5 14B Q4_K_M ожидается порядка **20–30 ток/с** на пустом контексте и падает к **8–12 ток/с** к 8k.
-- Для длинных книг гоняйте перевод **батчами по главам**: `translate_book.py` уже умеет резюмировать с контрольной точки (`--resume`).
+## Под капотом: настройки в Modelfile
+
+```text
+PARAMETER num_ctx 8192
+PARAMETER num_gpu 99
+PARAMETER temperature 0.3
+PARAMETER top_p 0.9
+PARAMETER repeat_penalty 1.1
+```
+
+- `num_ctx 8192` — окно контекста; на 12 ГБ VRAM это около 7–8 ГБ суммарно вместе с моделью.
+- `num_gpu 99` — оффлоадить все слои на ускоритель (Ollama сама уменьшит, если не влезет).
+- Низкая температура и `repeat_penalty 1.1` — стабильный перевод без зацикливаний на длинных текстах.
+
+Mac-пользователи без оглядки на VRAM могут увеличить `num_ctx` до `16384` и пересобрать образ:
+
+```bash
+ollama create translator-qwen -f modelfiles/translator-qwen.Modelfile
+```
 
 ## Известные грабли
 
-- `winget` иногда ставит Ollama без перезагрузки PATH — закройте и заново откройте PowerShell.
-- Если `ollama run` пишет `CUDA error: out of memory`, уменьшите `num_ctx` в Modelfile и пересоздайте образ: `ollama create translator-qwen -f modelfiles\translator-qwen.Modelfile`.
-- Антивирус (особенно Защитник Windows) может тормозить первый запуск — добавьте папку `%LOCALAPPDATA%\Programs\Ollama` в исключения.
+- **Windows / winget**: после установки Ollama закройте и заново откройте PowerShell — иначе `ollama` не находится в текущей сессии.
+- **Windows / антивирус**: Защитник Windows может тормозить первый запуск — добавьте `%LOCALAPPDATA%\Programs\Ollama` в исключения.
+- **macOS / Gatekeeper**: при первом запуске .app может ругаться — System Settings → Privacy & Security → «Open Anyway».
+- **macOS / память**: если `ollama` падает с `failed to allocate` — закройте Chrome/Slack и проверьте, что свободно хотя бы 14 ГБ под Qwen 14B.

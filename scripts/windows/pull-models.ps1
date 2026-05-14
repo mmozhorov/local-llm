@@ -10,7 +10,8 @@ function Write-Section($msg) {
     Write-Host "=== $msg ===" -ForegroundColor Cyan
 }
 
-$repoRoot = Split-Path -Parent $PSScriptRoot
+# Скрипт лежит в scripts/windows/, поэтому корень репозитория — на два уровня выше.
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 
 $baseModels = @(
     "qwen2.5:14b-instruct-q4_K_M",
