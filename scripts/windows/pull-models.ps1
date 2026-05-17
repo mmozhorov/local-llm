@@ -25,7 +25,8 @@ foreach ($m in $baseModels) {
 
 $customModels = @(
     @{ Name = "translator-qwen"; File = "modelfiles\translator-qwen.Modelfile" },
-    @{ Name = "translator-nemo"; File = "modelfiles\translator-nemo.Modelfile" }
+    @{ Name = "translator-nemo"; File = "modelfiles\translator-nemo.Modelfile" },
+    @{ Name = "finance-agent"; File = "modelfiles\finance-agent.Modelfile" }
 )
 
 foreach ($cm in $customModels) {

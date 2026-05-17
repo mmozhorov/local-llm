@@ -22,6 +22,7 @@ done
 custom=(
     "translator-qwen:modelfiles/translator-qwen.Modelfile"
     "translator-nemo:modelfiles/translator-nemo.Modelfile"
+    "finance-agent:modelfiles/finance-agent.Modelfile"
 )
 
 for entry in "${custom[@]}"; do

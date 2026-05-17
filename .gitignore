@@ -8,6 +8,10 @@ __pycache__/
 translate/config.yaml
 *.progress.json
 
+# Finance agent: пользовательские сессии и приватный конфиг
+finance/config.yaml
+docs/research/
+
 # Locally downloaded books / translations
 books/
 out/

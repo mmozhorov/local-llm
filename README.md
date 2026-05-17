@@ -32,7 +32,8 @@
 │       └── start-api.sh
 ├── modelfiles/
 │   ├── translator-qwen.Modelfile
-│   └── translator-nemo.Modelfile
+│   ├── translator-nemo.Modelfile
+│   └── finance-agent.Modelfile
 ├── translate/
 │   ├── requirements.txt
 │   ├── translate_book.py
@@ -43,6 +44,14 @@
 │   ├── preprocess.py
 │   ├── config.example.yaml
 │   └── voices/.gitkeep
+├── finance/
+│   ├── analyze.py
+│   ├── config.example.yaml
+│   └── requirements.txt
+├── docs/
+│   ├── financial-agent.md
+│   └── claude-code-finance-howto.md
+├── .claude/skills/financial-analysis/
 └── .gitignore
 ```
 
@@ -261,6 +270,29 @@ Mac-пользователи без оглядки на VRAM могут увел
 ```bash
 ollama create translator-qwen -f modelfiles/translator-qwen.Modelfile
 ```
+
+## Финансовый агент (бонус)
+
+Помимо перевода, в репо лежит протокол **финансового агента** для пошагового
+анализа публичной компании (фундамент + техника + сентимент) в стиле workflow
+`obra/superpowers`:
+
+- `modelfiles/finance-agent.Modelfile` — образ Ollama (Qwen2.5 14B).
+- `.claude/skills/financial-analysis/` — 7 фазовых skill-файлов + shared.
+- `finance/analyze.py` — Python-конвейер по фазам через локальный Ollama API.
+- `docs/financial-agent.md` — методология и best practices.
+- `docs/claude-code-finance-howto.md` — инструкция «как готовить и запускать»
+  (Claude Code + локальный Ollama, два режима + гибрид).
+
+Быстрый старт после `pull-models.{ps1,sh}`:
+
+```bash
+pip install -r finance/requirements.txt
+cp finance/config.example.yaml finance/config.yaml
+python finance/analyze.py --ticker AAPL
+```
+
+Подробности — в `docs/claude-code-finance-howto.md`.
 
 ## Известные грабли
 
